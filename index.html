@@ -187,12 +187,13 @@
     <div class="container">
       <h1>CHIPS Faucet</h1>
       <input id="wallet" type="text" placeholder="Wallet address (0x...)">
+      <div class="g-recaptcha" data-sitekey="6LcxI3UrAAAAAOoC25nCct33LeEJHxYCG0ClO9wQ"></div>
       <button onclick="claimFaucet()">Claim Faucet</button>
       <div id="result"></div>
-      <div id="totalClaimed">🔥 Total wallet claimed: ...</div>
+      <div id="totalClaimed">🔥 Total wallet claimed: ... | Faucet Balance: ... CHIPS</div>
       <pre id="claimHistory">Loading claim history...</pre>
       <div class="donate-section">
-        <div class="donate-address">DONATE: 0x3feBdD2e594107D010FB551569cCEedE7041Df4</div><br />
+        <div class="donate-address">DONATE: 0x3feBdD2e594107D010FB551569cCEed8E7041Df4</div><br />
         <button class="copy-button" onclick="copyAddress()">Copy</button>
       </div>
     </div>
@@ -217,7 +218,15 @@
       const resultDiv = document.getElementById("result");
       const totalClaimedDiv = document.getElementById("totalClaimed");
       const historyBlock = document.getElementById("claimHistory");
-      const claimButton = document.querySelector("button[onclick='claimFaucet()']");
+      const claimButton
+
+ = document.querySelector("button[onclick='claimFaucet()']");
+
+      const token = grecaptcha.getResponse();
+      if (!token) {
+        resultDiv.innerHTML = "❌ Please complete the CAPTCHA.";
+        return;
+      }
 
       if (!wallet || !wallet.match(/^0x[a-fA-F0-9]{40}$/)) {
         resultDiv.innerHTML = "❌ Invalid wallet address.";
@@ -232,19 +241,22 @@
         const res = await fetch("/api/claim", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet }),
+          body: JSON.stringify({ wallet, captcha: token }),
         });
         const data = await res.json();
         if (res.ok) {
           const txLink = `http://testnet.chipsprotocol.com/tx/${data.txHash}`;
           resultDiv.innerHTML = `✅ Success! <a href="${txLink}" target="_blank">${data.txHash}</a>`;
-          totalClaimedDiv.innerHTML = `🔥 Total wallet claimed: ${data.totalClaimed}`;
+          totalClaimedDiv.innerHTML = `🔥 Total wallet claimed: ${data.totalClaimed} | Faucet Balance: ${parseFloat(data.faucetBalance).toFixed(2)} CHIPS`;
           historyBlock.innerText = [`• ${wallet} — 1000 CHIPS`, ...(data.allClaims || [])].map(addr => addr.startsWith('•') ? addr : `• ${addr} — 1000 CHIPS`).join("\n");
+          grecaptcha.reset();
         } else {
           resultDiv.innerHTML = `❌ Error: ${data.error}`;
+          grecaptcha.reset();
         }
       } catch (err) {
         resultDiv.innerHTML = "❌ Unexpected error occurred.";
+        grecaptcha.reset();
       } finally {
         claimButton.disabled = false;
         claimButton.innerText = "Claim Faucet";
@@ -263,7 +275,7 @@
         const res = await fetch("/api/claim-history");
         const data = await res.json();
         if (res.ok && data.claims) {
-          document.getElementById("totalClaimed").innerText = `🔥 Total wallet claimed: ${data.claims.length}`;
+          document.getElementById("totalClaimed").innerText = `🔥 Total wallet claimed: ${data.claims.length} | Faucet Balance: ${parseFloat(data.faucetBalance).toFixed(2)} CHIPS`;
           document.getElementById("claimHistory").innerText = data.claims.map(addr => `• ${addr} — 1000 CHIPS`).join("\n");
         } else {
           document.getElementById("claimHistory").innerText = "❌ Failed to load history.";
