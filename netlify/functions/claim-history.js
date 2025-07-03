@@ -1,8 +1,9 @@
 require("dotenv").config();
 const fetch = require("node-fetch");
+const { ethers } = require("ethers");
 
 exports.handler = async (event, context) => {
-  if (!process.env.GITHUB_REPOSITORY || !process.env.CLAIM_TOKEN) {
+  if (!process.env.GITHUB_REPOSITORY || !process.env.CLAIM_TOKEN || !process.env.PRIVATE_KEY) {
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Server misconfigured" }),
@@ -21,10 +22,16 @@ exports.handler = async (event, context) => {
       },
     });
 
+    const provider = new ethers.JsonRpcProvider("http://20.63.3.101:8545");
+    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    const faucetAddress = wallet.address;
+    const faucetBalance = await provider.getBalance(faucetAddress);
+    const balanceInChips = ethers.formatEther(faucetBalance);
+
     if (response.status === 404) {
       return {
         statusCode: 200,
-        body: JSON.stringify({ claims: [] }),
+        body: JSON.stringify({ claims: [], faucetBalance: balanceInChips }),
       };
     }
 
@@ -36,7 +43,7 @@ exports.handler = async (event, context) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ claims: walletList }),
+      body: JSON.stringify({ claims: walletList, faucetBalance: balanceInChips }),
     };
   } catch (err) {
     console.error("History fetch error:", err.message);
