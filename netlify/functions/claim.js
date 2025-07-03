@@ -63,14 +63,15 @@ exports.handler = async (event, context) => {
       }
     }
 
+    const provider = new ethers.JsonRpcProvider("http://20.63.3.101:8545");
+    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    const faucetAddress = wallet.address;
+
     const { content: claims, sha } = await readClaims();
 
     if (claims[normalizedWallet]) {
       return { statusCode: 400, body: JSON.stringify({ error: "Wallet already claimed" }) };
     }
-
-    const provider = new ethers.JsonRpcProvider("http://20.63.3.101:8545");
-    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
     const tx = await wallet.sendTransaction({
       to: normalizedWallet,
@@ -83,6 +84,8 @@ exports.handler = async (event, context) => {
     await writeClaims(claims, sha);
 
     const allClaims = Object.keys(claims).reverse();
+    const faucetBalance = await provider.getBalance(faucetAddress);
+    const balanceInChips = ethers.formatEther(faucetBalance);
 
     return {
       statusCode: 200,
@@ -90,6 +93,7 @@ exports.handler = async (event, context) => {
         txHash: receipt.hash,
         totalClaimed: allClaims.length,
         allClaims,
+        faucetBalance: balanceInChips,
       }),
     };
   } catch (error) {
